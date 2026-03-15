@@ -1,12 +1,13 @@
 #pragma once
 #include "token.h"
 #include <string>
+#include <vector>
 
 class Lexer {
 public:
     explicit Lexer(const std::string& input);
 
-    Token nextToken();
+    std::vector<Token> tokenize();
 
 private:
     std::string input;
@@ -15,4 +16,5 @@ private:
     char peek();
     char get();
     void skipWhitespace();
+    Token nextToken();
 };

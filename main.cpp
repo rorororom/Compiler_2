@@ -32,10 +32,19 @@ int main() {
     )";
 
     Lexer lexer(code);
-    Parser parser(lexer);
+    std::vector<Token> tokens = lexer.tokenize();
 
+    std::cout << "=== TOKENS ===" << std::endl;
+    for (const auto& token : tokens) {
+        std::cout << static_cast<int>(token.type) << ": " 
+                  << token.lexeme << std::endl;
+    }
+    std::cout << std::endl;
+
+    Parser parser(tokens);
     auto program = parser.parseProgram();
 
+    std::cout << "=== OUTPUT ===" << std::endl;
     Context ctx;
     program->execute(ctx);
 

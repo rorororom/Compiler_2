@@ -1,3 +1,4 @@
+// lexer.cpp
 #include "lexer.h"
 #include <cctype>
 
@@ -18,9 +19,7 @@ char Lexer::get() {
 }
 
 void Lexer::skipWhitespace() {
-    while (std::isspace(peek())) {
-        get();
-    }
+    while (std::isspace(peek())) get();
 }
 
 Token Lexer::nextToken() {
@@ -28,7 +27,7 @@ Token Lexer::nextToken() {
     char c = peek();
 
     if (c == '\0') {
-        return {TokenType::END, ""};
+        return Token(TokenType::END, "");
     }
 
     if (std::isalpha(c)) {
@@ -36,24 +35,13 @@ Token Lexer::nextToken() {
         while (std::isalnum(peek())) {
             value += get();
         }
-
-        if (value == "declare") {
-            return {TokenType::DECLARE, value};
+        
+        auto it = KEYWORDS.find(value);
+        if (it != KEYWORDS.end()) {
+            return {it->second, value};
         }
-        if (value == "int") {
-            return {TokenType::INT, value};
-        }
-        if (value == "if") {
-            return {TokenType::IF, value};
-        }
-        if (value == "else") {
-            return {TokenType::ELSE, value};
-        }
-        if (value == "print") {
-            return {TokenType::PRINT, value};
-        }
-
-        return {TokenType::ID, value};
+        
+        return Token(TokenType::ID, value);
     }
 
     if (std::isdigit(c)) {
@@ -61,42 +49,38 @@ Token Lexer::nextToken() {
         while (std::isdigit(peek())) {
             value += get();
         }
-        return {TokenType::NUMBER, value};
+        return Token(TokenType::NUMBER, value);
     }
 
     if (c == '=') {
         get();
         if (peek() == '=') {
             get();
-            return {TokenType::EQUAL, "=="};
+            return Token(TokenType::EQUAL, "==");
         }
-        return {TokenType::ASSIGN, "="};
+        return Token(TokenType::ASSIGN, "=");
     }
 
-    if (c == ':') {
+    auto it = SINGLE_TOKENS.find(c);
+    if (it != SINGLE_TOKENS.end()) {
         get();
-        return {TokenType::COLON, ":"};
-    }
-    if (c == ';') {
-        get();
-        return {TokenType::SEMICOLON, ";"};
-    }
-    if (c == '(') {
-        get();
-        return {TokenType::LPAREN, "("};
-    }
-    if (c == ')') {
-        get();
-        return {TokenType::RPAREN, ")"};
-    }
-    if (c == '{') {
-        get();
-        return {TokenType::LBRACE, "{"};
-    }
-    if (c == '}') {
-        get();
-        return {TokenType::RBRACE, "}"};
+        return {it->second, std::string(1, c)};
     }
 
     throw std::runtime_error("Unknown character");
+}
+
+std::vector<Token> Lexer::tokenize() {
+    std::vector<Token> tokens;
+    
+    while (true) {
+        Token token = nextToken();
+        tokens.push_back(token);
+        
+        if (token.type == TokenType::END) {
+            break;
+        }
+    }
+    
+    return tokens;
 }

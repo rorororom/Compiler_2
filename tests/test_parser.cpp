@@ -9,7 +9,8 @@ class ParserTest : public ::testing::Test {
 protected:
     Parser createParser(const std::string& input) {
         Lexer lexer(input);
-        return Parser(lexer);
+        std::vector<Token> tokens = lexer.tokenize();
+        return Parser(tokens);
     }
     
     void captureOutput(std::function<void()> func, std::string& output) {
@@ -53,8 +54,7 @@ TEST_F(ParserTest, ExecuteDeclaration) {
     Context ctx;
     
     program->execute(ctx);
-    
-    // After declaration, variable should exist with value 0
+
     EXPECT_EQ(ctx.get("x"), 0);
 }
 
@@ -104,7 +104,7 @@ TEST_F(ParserTest, EvaluateEqualityTrue) {
     
     program->execute(ctx);
     
-    EXPECT_EQ(ctx.get("x"), 1);  // True is 1
+    EXPECT_EQ(ctx.get("x"), 1);
 }
 
 TEST_F(ParserTest, EvaluateEqualityFalse) {
@@ -115,7 +115,7 @@ TEST_F(ParserTest, EvaluateEqualityFalse) {
     
     program->execute(ctx);
     
-    EXPECT_EQ(ctx.get("x"), 0);  // False is 0
+    EXPECT_EQ(ctx.get("x"), 0);
 }
 
 TEST_F(ParserTest, ComplexProgram) {
@@ -256,4 +256,130 @@ TEST_F(ParserTest, NestedIfStatements) {
     captureOutput([&]() { program->execute(ctx); }, output);
     
     EXPECT_EQ(output, "1\n2\n");
+}
+
+TEST_F(ParserTest, ParseAddition) {
+    Parser parser = createParser("x = 5 + 3;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 8);
+}
+
+TEST_F(ParserTest, ParseSubtraction) {
+    Parser parser = createParser("x = 10 - 3;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 7);
+}
+
+TEST_F(ParserTest, ParseMultiplication) {
+    Parser parser = createParser("x = 4 * 5;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 20);
+}
+
+TEST_F(ParserTest, ParseDivision) {
+    Parser parser = createParser("x = 20 / 4;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 5);
+}
+
+TEST_F(ParserTest, OperatorPrecedence) {
+    Parser parser = createParser("x = 2 + 3 * 4;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 14);  // 2 + (3 * 4) = 14
+}
+
+TEST_F(ParserTest, ParenthesesOverridePrecedence) {
+    Parser parser = createParser("x = (2 + 3) * 4;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 20);  // (2 + 3) * 4 = 20
+}
+
+TEST_F(ParserTest, ComplexExpression) {
+    Parser parser = createParser("x = 100 - 20 / 4 + 3 * 2;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    program->execute(ctx);
+    
+    EXPECT_EQ(ctx.get("x"), 101);  // 100 - 5 + 6 = 101
+}
+
+TEST_F(ParserTest, DivisionByZero) {
+    Parser parser = createParser("x = 10 / 0;");
+    auto program = parser.parseProgram();
+    Context ctx;
+    ctx.declare("x");
+    
+    EXPECT_THROW(program->execute(ctx), std::runtime_error);
+}
+
+TEST_F(ParserTest, ArithmeticInCondition) {
+    std::string code = R"(
+        if (10 + 5 == 15) {
+            print(1);
+        } else {
+            print(0);
+        }
+    )";
+    
+    Parser parser = createParser(code);
+    auto program = parser.parseProgram();
+    Context ctx;
+    
+    std::string output;
+    captureOutput([&]() { program->execute(ctx); }, output);
+    
+    EXPECT_EQ(output, "1\n");
+}
+
+TEST_F(ParserTest, VariablesInArithmetic) {
+    std::string code = R"(
+        declare a: int;
+        declare b: int;
+        declare c: int;
+        a = 10;
+        b = 5;
+        c = a + b * 2;
+        print(c);
+    )";
+    
+    Parser parser = createParser(code);
+    auto program = parser.parseProgram();
+    Context ctx;
+    
+    std::string output;
+    captureOutput([&]() { program->execute(ctx); }, output);
+    
+    EXPECT_EQ(output, "20\n");  // 10 + (5 * 2) = 20
 }
