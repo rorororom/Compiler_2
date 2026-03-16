@@ -1,6 +1,17 @@
 # Компилятор
 
-## Итерация 0. Лексер и Парсер
+### Сборка и запуск
+
+```bash
+mkdir build && cd build
+cmake ..
+make
+./compiler
+./compiler_tests
+```
+
+
+## Итерация 1. Лексер и Парсер
 
 Реализация лексического анализатора и синтаксического анализатора для простого языка программирования.
 
@@ -11,15 +22,22 @@
 - **Функция print:** `print(int)`
 - **Синтаксическое дерево:** базовый класс для каждого нетерминала, производные классы для правил
 
+## Итерация 2. Визиторы
 
-### Сборка и запуск
+Реализация паттерна Visitor для обхода AST.
 
-```bash
-mkdir build && cd build
-cmake ..
-make
-./compiler
-./compiler_tests
+### Что добавлено
+- **Базовый класс Visitor** (`visitor/include/visitor.h`) - интерфейс для всех визиторов
+- **PrintVisitor** (`visitor/src/print_visitor.cpp`) - печатает AST в файл `ast_output.txt`
+- **InterpreterVisitor** (`visitor/src/interpreter_visitor.cpp`) - интерпретирует и выполняет программу
+
+### Как работает
+```cpp
+PrintVisitor printVisitor("ast_output.txt");
+InterpreterVisitor interpreter;
+
+program->accept(&printVisitor);  // Печать структуры
+program->accept(&interpreter);   // Выполнение программы
 ```
 
 ### Примеры
@@ -42,8 +60,7 @@ if (x == 10) {
 }
 ```
 
-####
-Грамматика языка
+#### Грамматика языка
 ```txt
 program        → statement* EOF
 

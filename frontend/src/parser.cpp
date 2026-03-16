@@ -1,125 +1,9 @@
 #include "parser.h"
-#include "context.h"
+#include "statements.h"
+#include "expressions.h"
+#include "program.h"
 #include <stdexcept>
 #include <iostream>
-
-class NumberExpr : public Expression {
-    int value;
-public:
-    NumberExpr(int v) : value(v) {}
-    int evaluate(Context&) override { return value; }
-};
-
-class VariableExpr : public Expression {
-    std::string name;
-public:
-    VariableExpr(std::string n) : name(n) {}
-    int evaluate(Context& ctx) override;
-};
-
-class EqualExpr : public Expression {
-    std::unique_ptr<Expression> left, right;
-public:
-    EqualExpr(std::unique_ptr<Expression> l,
-              std::unique_ptr<Expression> r)
-        : left(std::move(l)), right(std::move(r)) {}
-
-    int evaluate(Context& ctx) override {
-        return left->evaluate(ctx) == right->evaluate(ctx);
-    }
-};
-
-class DeclareStmt : public Node {
-    std::string name;
-public:
-    DeclareStmt(std::string n) : name(n) {}
-    void execute(Context& ctx) override;
-};
-
-class AssignStmt : public Node {
-    std::string name;
-    std::unique_ptr<Expression> expr;
-public:
-    AssignStmt(std::string n, std::unique_ptr<Expression> e)
-        : name(n), expr(std::move(e)) {}
-    void execute(Context& ctx) override;
-};
-
-class PrintStmt : public Node {
-    std::unique_ptr<Expression> expr;
-public:
-    PrintStmt(std::unique_ptr<Expression> e)
-        : expr(std::move(e)) {}
-    void execute(Context& ctx) override;
-};
-
-class IfStmt : public Node {
-    std::unique_ptr<Expression> cond;
-public:
-    std::vector<std::unique_ptr<Node>> thenBranch;
-    std::vector<std::unique_ptr<Node>> elseBranch;
-    
-    IfStmt(std::unique_ptr<Expression> c) : cond(std::move(c)) {}
-    void execute(Context& ctx) override;
-};
-
-class BinaryExpr : public Expression {
-    std::unique_ptr<Expression> left;
-    std::unique_ptr<Expression> right;
-    TokenType op;
-    
-public:
-    BinaryExpr(std::unique_ptr<Expression> l, 
-               TokenType op,
-               std::unique_ptr<Expression> r)
-        : left(std::move(l)), op(op), right(std::move(r)) {}
-    
-    int evaluate(Context& ctx) override {
-        int leftVal = left->evaluate(ctx);
-        int rightVal = right->evaluate(ctx);
-        
-        switch (op) {
-            case TokenType::PLUS:  return leftVal + rightVal;
-            case TokenType::MINUS: return leftVal - rightVal;
-            case TokenType::MUL:  return leftVal * rightVal;
-            case TokenType::DIV: 
-                if (rightVal == 0) {
-                    throw std::runtime_error("Division by zero");
-                }
-                return leftVal / rightVal;
-            default:
-                throw std::runtime_error("Unknown binary operator");
-        }
-    }
-};
-
-int VariableExpr::evaluate(Context& ctx) {
-    return ctx.get(name);
-}
-
-void DeclareStmt::execute(Context& ctx) {
-    ctx.declare(name);
-}
-
-void AssignStmt::execute(Context& ctx) {
-    ctx.assign(name, expr->evaluate(ctx));
-}
-
-void PrintStmt::execute(Context& ctx) {
-    ctx.print(expr->evaluate(ctx));
-}
-
-void IfStmt::execute(Context& ctx) {
-    if (cond->evaluate(ctx)) {
-        for (auto& stmt : thenBranch) {
-            stmt->execute(ctx);
-        }
-    } else {
-        for (auto& stmt : elseBranch) {
-            stmt->execute(ctx);
-        }
-    }
-}
 
 Parser::Parser(std::vector<Token> tokens)
     : tokens(std::move(tokens)), position(0) {} 
@@ -208,7 +92,7 @@ std::unique_ptr<Node> Parser::parseStatement() {
         auto ifStmt = std::make_unique<IfStmt>(std::move(cond));
     
         while (!check(TokenType::RBRACE) && !isAtEnd()) {
-            ifStmt->thenBranch.push_back(parseStatement());
+            ifStmt->addThenStatement(parseStatement());
         }
         
         consume(TokenType::RBRACE);
@@ -217,7 +101,7 @@ std::unique_ptr<Node> Parser::parseStatement() {
             consume(TokenType::LBRACE);
             
             while (!check(TokenType::RBRACE) && !isAtEnd()) {
-                ifStmt->elseBranch.push_back(parseStatement());
+                ifStmt->addElseStatement(parseStatement());
             }
             
             consume(TokenType::RBRACE);
@@ -290,21 +174,18 @@ std::unique_ptr<Expression> Parser::parseMultiplication() {
 }
 
 std::unique_ptr<Expression> Parser::parsePrimary() {
-    // NUMBER literal
     if (check(TokenType::NUMBER)) {
         int val = std::stoi(current().lexeme);
         advance();
         return std::make_unique<NumberExpr>(val);
     }
 
-    // VARIABLE reference
     if (check(TokenType::ID)) {
         std::string name = current().lexeme;
         advance();
         return std::make_unique<VariableExpr>(name);
     }
 
-    // Parenthesized expression
     if (match(TokenType::LPAREN)) {
         auto expr = parseExpression();
         consume(TokenType::RPAREN);

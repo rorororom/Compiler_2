@@ -5,4 +5,5 @@ class Expression : public Node {
 public:
     virtual int evaluate(Context& ctx) = 0;
     void execute(Context& ctx) override {}
+    void accept(Visitor* visitor) override = 0;
 };

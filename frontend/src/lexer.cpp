@@ -1,4 +1,3 @@
-// lexer.cpp
 #include "lexer.h"
 #include <cctype>
 
