@@ -4,8 +4,7 @@
 #include "program.h"
 #include <iostream>
 
-PrintVisitor::PrintVisitor(const std::string& filename) {
-    out.open(filename);
+PrintVisitor::PrintVisitor(const std::string& filename) : out(filename) {
     if (!out.is_open()) {
         throw std::runtime_error("Cannot open file: " + filename);
     }
@@ -52,18 +51,14 @@ void PrintVisitor::visit(DeclareStmt* node) {
 void PrintVisitor::visit(AssignStmt* node) {
     printIndent();
     out << "Assign: " << node->getName() << " = ";
-    indent++;
     node->getExpression()->accept(this);
-    indent--;
     out << std::endl;
 }
 
 void PrintVisitor::visit(PrintStmt* node) {
     printIndent();
     out << "Print: ";
-    indent++;
     node->getExpression()->accept(this);
-    indent--;
     out << std::endl;
 }
 

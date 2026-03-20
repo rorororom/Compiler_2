@@ -6,7 +6,7 @@
 mkdir build && cd build
 cmake ..
 make
-./compiler
+./compiler ../example.txt
 ./compiler_tests
 ```
 

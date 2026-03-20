@@ -1,0 +1,19 @@
+declare a: int;
+declare b: int;
+declare result: int;
+
+a = 6;
+b = 7;
+result = a * b;
+
+if (result == 42) {
+    print(1);
+} else {
+    print(0);
+}
+
+if (a * 2 == b + 5) {
+    print(100);
+} else {
+    print(200);
+}
