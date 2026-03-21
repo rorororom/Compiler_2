@@ -3,11 +3,20 @@
 #include "token.h"
 #include <fstream>
 #include <string>
+#include <unordered_map>
+
+inline const std::unordered_map<TokenType, std::string> OP_TO_STRING = {
+    {TokenType::PLUS,  "+"},
+    {TokenType::MINUS, "-"},
+    {TokenType::MUL,   "*"},
+    {TokenType::DIV,   "/"},
+    {TokenType::EQUAL, "=="},
+};
 
 class PrintVisitor : public Visitor {
     std::ofstream out;
-    int indent = 0;
-    
+    size_t indent = 0;
+
     void printIndent();
     std::string opToString(TokenType op);
     

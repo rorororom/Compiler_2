@@ -17,20 +17,14 @@ PrintVisitor::~PrintVisitor() {
 }
 
 void PrintVisitor::printIndent() {
-    for (int i = 0; i < indent; ++i) {
+    for (size_t i = 0; i < indent; ++i) {
         out << "  ";
     }
 }
 
 std::string PrintVisitor::opToString(TokenType op) {
-    switch (op) {
-        case TokenType::PLUS: return "+";
-        case TokenType::MINUS: return "-";
-        case TokenType::MUL: return "*";
-        case TokenType::DIV: return "/";
-        case TokenType::EQUAL: return "==";
-        default: return "?";
-    }
+    auto it = OP_TO_STRING.find(op);
+    return it != OP_TO_STRING.end() ? it->second : "?";
 }
 
 void PrintVisitor::visit(Program* node) {
