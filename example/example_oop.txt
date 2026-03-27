@@ -1,0 +1,44 @@
+class Point {
+    int x;
+    int y;
+
+    int getX() {
+        return x;
+    }
+
+    int getY() {
+        return y;
+    }
+
+    int sum() {
+        int result = x + y;
+        return result;
+    }
+}
+
+class Counter {
+    int count;
+
+    int increment(int delta) {
+        int newVal = count + delta;
+        count = newVal;
+        return count;
+    }
+
+    int reset() {
+        count = 0;
+        return count;
+    }
+}
+
+declare a: int;
+declare b: int;
+
+a = 10;
+b = 20;
+
+if (a + b == 30) {
+    print(1);
+} else {
+    print(0);
+}

@@ -1,0 +1,15 @@
+declare x: int;
+declare y: int;
+
+x = 5;
+y = 10;
+
+if (x + y == 15) {
+    declare x: int;
+    x = 99;
+    print(x);
+} else {
+    print(x);
+}
+
+print(x);

@@ -1,0 +1,11 @@
+declare x: int;
+declare y: int;
+
+x = 10;
+y = 20;
+
+if (x + y == 31) {
+    print(999);
+} else {
+    print(111);
+}
