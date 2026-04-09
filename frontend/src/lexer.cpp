@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include <cctype>
+#include <stdexcept>
 
 Lexer::Lexer(const std::string& input) : input(input), pos(0) {}
 

@@ -1,211 +1,104 @@
-# Compiler Project
+# Компилятор 
+## Что сделано
 
-A mini-compiler for a simple OOP language, built incrementally across checkpoints.
+Написан `LLVMVisitor` — визитор, который обходит AST и генерирует LLVM IR через C++ API (IRBuilder). Каждый узел дерева преобразуется в соответствующую инструкцию:
 
----
+- переменные — `alloca` + `load`/`store`
+- арифметика — `add`, `sub`, `mul`, `sdiv`
+- сравнение — `icmp eq` + `zext`
+- `if/else` — условный переход с блоками `then`/`else`/`merge`
+- `print` — вызов `printf("%d\n", ...)`
+- классы — именованные LLVM-структуры, методы — функции с неявным `self`
+- `new ClassName()` — `malloc` + `memset` + bitcast
+- `new int[n]` — `malloc` + bitcast в `i32*`
 
-## Project Structure
+Парсинг аргументов командной строки переписан на `llvm::cl`.
 
-```
-Compiler_2/
-├── frontend/          # Lexer + Parser (source → tokens → AST)
-│   ├── include/
-│   │   ├── token.h        — TokenType enum, Token struct, keyword maps
-│   │   ├── lexer.h        — Lexer declaration
-│   │   └── parser.h       — Parser declaration
-│   └── src/
-│       ├── lexer.cpp      — Tokeniser (skips // comments)
-│       └── parser.cpp     — Recursive-descent parser
-│
-├── ast/               # Abstract Syntax Tree node definitions
-│   ├── include/
-│   │   ├── node.h         — Base Node (execute + accept)
-│   │   ├── expression.h   — Base Expression
-│   │   ├── expressions.h  — NumberExpr, VariableExpr, BinaryExpr, EqualExpr
-│   │   ├── statements.h   — DeclareStmt, AssignStmt, PrintStmt, IfStmt
-│   │   ├── program.h      — Program (root node)
-│   │   └── oop_nodes.h    — ClassDecl, FieldDecl, MethodDecl, ReturnStmt,
-│   │                        VarDeclStmt, NewObjectExpr, NewArrayExpr,
-│   │                        MethodCallExpr, FieldAccessExpr, ThisExpr,
-│   │                        ArrayAccessExpr, ArrayLengthExpr
-│   └── src/
-│       ├── expressions.cpp
-│       ├── statements.cpp
-│       ├── program.cpp
-│       └── oop_nodes.cpp  — accept() dispatch for OOP nodes
-│
-├── semantic/          # Middle-end: semantic analysis
-│   └── include/
-│       ├── symbol_table.h — TypeInfo, VariableSymbol, MethodSymbol,
-│       │                    ClassSymbol (fields + methods + constructor★),
-│       │                    SymbolTable (global class registry)
-│       └── scope_tree.h   — ScopeKind, Scope (tree node with locals map),
-│                            ScopeTree (stack-based push/pop API)
-│
-├── visitor/           # Visitor pattern implementations
-│   ├── include/
-│   │   ├── visitor.h              — Abstract Visitor base (all visit() overloads)
-│   │   ├── print_visitor.h        — AST pretty-printer to file
-│   │   ├── interpreter_visitor.h  — Tree-walking interpreter
-│   │   └── scope_visitor.h        — Scope tree builder (two-pass)
-│   └── src/
-│       ├── print_visitor.cpp
-│       ├── interpreter_visitor.cpp
-│       └── scope_visitor.cpp      — Pass 1: collectClasses → SymbolTable
-│                                    Pass 2: accept → ScopeTree
-│
-├── backend/           # Back-end (IR generation / code emission — future)
-│   └── include/
-│       └── context.h  — Runtime variable map (used by interpreter visitor)
-│
-├── tests/
-│   ├── test_lexer.cpp         — 34 lexer tests
-│   ├── test_parser.cpp        — 45 parser tests
-│   └── test_scope_visitor.cpp — 56 semantic analysis tests
-│
-├── example/
-│   ├── example.txt            — Basic arithmetic + if/else
-│   ├── example_1.txt          — Variables + arithmetic
-│   ├── example_oop.txt        — Two classes with fields and methods
-│   └── example_shadowing.txt  — Variable shadowing (warning demo)
-│
-├── main.cpp           — Entry point: lex → parse → print AST → scope analysis
-└── CMakeLists.txt
-```
+Сборка упакована в Docker — Ubuntu 22.04 + LLVM 17 + clang-17. Сгенерированный `.ll` файл компилируется `clang`-ом в нативный бинарник.
 
----
-
-## Architecture
+## Структура пайплайна
 
 ```
-Source code
-    │
-    ▼
-┌─────────┐
-│  Lexer  │  frontend/src/lexer.cpp
-└────┬────┘
-     │ tokens
-     ▼
-┌─────────┐
-│ Parser  │  frontend/src/parser.cpp
-└────┬────┘
-     │ AST (Program*)
-     ▼
-┌──────────────────────────────────────────────────────┐
-│                   Visitor passes                     │
-│                                                      │
-│  PrintVisitor      — pretty-print AST to file        │
-│  ScopeVisitor      — two-pass semantic analysis:     │
-│    Pass 1: collectClasses → SymbolTable              │
-│    Pass 2: accept         → ScopeTree                │
-│  InterpreterVisitor — tree-walking execution         │
-└──────────────────────────────────────────────────────┘
-     │
-     ▼
-  backend/  (IR generation — next checkpoint)
+исходный файл -> Lexer -> Parser -> AST -> ScopeVisitor -> LLVMVisitor -> output.ll -> clang -> бинарник
 ```
 
----
-
-## Semantic Analysis (Checkpoint 2)
-
-### Symbol Table (`semantic/include/symbol_table.h`)
-
-Leaf-level data referenced by scope nodes:
-
-| Type | Description |
-|------|-------------|
-| `TypeInfo` | Type descriptor: `INT`, `CLASS_INST`, `ARRAY_INT`, `ARRAY_CLASS` |
-| `VariableSymbol` | name + type + storage kind (`LOCAL`/`FIELD`/`PARAM`) + slot index |
-| `MethodSymbol` | name, return type, ordered params, owner class, `isConstructor` flag |
-| `ClassSymbol` | name, private fields (indexed), public methods map |
-| `SymbolTable` | Global `unordered_map<string, ClassSymbol>` |
-
-**★ Constructor handling:** `ClassSymbol::ensureConstructor()` synthesises a
-`MethodSymbol` with `isConstructor = true` stored under the class name.
-`visit(NewObjectExpr*)` resolves it and uses `cs->fieldCount()` to determine
-how many words of memory the IR must allocate.
-
-### Scope Tree (`semantic/include/scope_tree.h`)
+## Флаги
 
 ```
-[global]
-  var x : int (local)
-  [class 'Point']
-    var x : int (field)
-    var y : int (field)
-    [method 'Point::getX']
-    [method 'Point::sum']
-      var result : int (local)
-  [block 'if-then']
-    var x : int (local)   ← shadows outer x (warning)
-  [block 'if-else']
+compiler <файл> [опции]
+
+  -o <файл>      выходной .ll файл (по умолчанию output.ll)
+  --print-ir     вывести IR в stdout
+  --print-ast    записать AST в ast_output.txt
+  --dump-scope   записать дерево скоупов в scope_tree_output.txt
+  --help         справка
 ```
 
-- `Scope::declare()` — throws `SemanticError` on double-declaration; warns on shadowing
-- `Scope::lookup()` — walks parent chain (innermost binding wins)
-- `ScopeTree::pushScope()` / `popScope()` — classic stack algorithm
+## Сборка и запуск
 
-### Semantic errors detected
-
-| Error | Message |
-|-------|---------|
-| Variable declared twice in same scope | `SemanticError: variable 'x' is already declared in this scope` |
-| Variable used before declaration | `SemanticError: variable 'z' used before declaration` |
-| Variable shadows outer declaration | `Warning: variable 'x' shadows an outer declaration` |
-| `this` outside a method | `SemanticError: 'this' used outside of a class method` |
-| Unknown class in `new` | `SemanticError: unknown class 'Foo'` |
-| Wrong constructor arg count | `SemanticError: constructor 'Foo' expects N argument(s), got M` |
-
----
-
-## Building
+Нужен Docker.
 
 ```bash
-mkdir -p Compiler_2/build && cd Compiler_2/build
-cmake ..
-cmake --build . --target compiler
-cmake --build . --target compiler_tests
-./compiler_tests
+cd Compiler_2
+docker build -t compiler2 .
 ```
 
-## Running
+Первый запуск занимает несколько минут — скачивается LLVM 17.
+
+Запуск примеров:
 
 ```bash
-./compiler ../example/example_oop.txt
-./compiler ../example/example_shadowing.txt
+docker run --rm compiler2 /bin/bash -c \
+  "./build/compiler example/example.txt -o out.ll && clang out.ll -o prog && ./prog"
+
+docker run --rm compiler2 /bin/bash -c \
+  "./build/compiler example/example_1.txt -o out.ll && clang out.ll -o prog && ./prog"
+
+docker run --rm compiler2 /bin/bash -c \
+  "./build/compiler example/example_oop.txt -o out.ll && clang out.ll -o prog && ./prog"
 ```
 
-Output files: `ast_output.txt`, `scope_tree_output.txt`
+Интерактивная оболочка:
 
----
-
-## Language Syntax
-
+```bash
+docker run --rm -it compiler2
 ```
-program     ::= statement*
-statement   ::= classDecl
-              | 'declare' ID ':' 'int' ';'
-              | type ID ['=' expr] ';'
-              | ID '=' expr ';'
-              | 'if' '(' expr ')' '{' statement* '}' ['else' '{' statement* '}']
-              | 'print' '(' expr ')' ';'
-              | 'return' [expr] ';'
 
-classDecl   ::= 'class' ID '{' member* '}'
-member      ::= type ID ';'                          // field
-              | type ID '(' params ')' '{' body '}'  // method
+Внутри контейнера:
 
-type        ::= ('int' | 'void' | ID) ['[]']
-params      ::= (type ID (',' type ID)*)?
-
-expr        ::= equality
-equality    ::= addition ('==' addition)*
-addition    ::= mult (('+' | '-') mult)*
-mult        ::= postfix (('*' | '/') postfix)*
-postfix     ::= primary ('.' ID ['(' args ')'] | '[' expr ']')*
-primary     ::= NUMBER | 'this' | ID
-              | 'new' type '(' args ')'
-              | 'new' type '[' expr ']'
-              | '(' expr ')'
+```bash
+./build/compiler example/example.txt -o output.ll --print-ir
+clang output.ll -o program
+./program
 ```
+
+Через скрипт:
+
+```bash
+chmod +x build.sh
+./build.sh build
+./build.sh run example/example.txt
+./build.sh shell
+./build.sh test
+```
+
+## Локальная сборка
+
+Если LLVM 17 уже установлен:
+
+```bash
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DLLVM_DIR=$(llvm-config-17 --cmakedir)
+cmake --build build -j$(nproc)
+./build/compiler example/example.txt -o output.ll
+clang output.ll -o program && ./program
+```
+
+## Примеры
+
+`example/example.txt` — `10 + 20 != 31`, выводит `111`.
+
+`example/example_1.txt` — `6 * 7 = 42`, выводит `1` и `100`.
+
+`example/example_oop.txt` — классы с полями и методами, выводит `1`. Классы преобразуются в LLVM-структуры, методы — в функции вида `Point__getX(%Point* %self)`.
