@@ -1,81 +1,95 @@
 #include "lexer.h"
 #include "parser.h"
 #include "print_visitor.h"
-#include "interpreter_visitor.h"
 #include "scope_visitor.h"
-#include <iostream>
+#include "llvm_visitor.h"
+
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/TargetSelect.h>
+
 #include <fstream>
 #include <sstream>
 
+static llvm::cl::opt<std::string> InputFile(
+    llvm::cl::Positional,
+    llvm::cl::desc("<source file>"),
+    llvm::cl::Required);
+
+static llvm::cl::opt<std::string> OutputFile(
+    "o",
+    llvm::cl::desc("Output .ll file (default: output.ll)"),
+    llvm::cl::value_desc("filename"),
+    llvm::cl::init("output.ll"));
+
+static llvm::cl::opt<bool> PrintAST(
+    "print-ast",
+    llvm::cl::desc("Write AST to ast_output.txt"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> PrintIR(
+    "print-ir",
+    llvm::cl::desc("Print LLVM IR to stdout"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> DumpScope(
+    "dump-scope",
+    llvm::cl::desc("Dump scope tree to scope_tree_output.txt"),
+    llvm::cl::init(false));
+
 int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <source_file>" << std::endl;
-        return 1;
-    }
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmParser();
+    llvm::InitializeNativeTargetAsmPrinter();
 
-    std::ifstream file(argv[1]);
+    llvm::cl::ParseCommandLineOptions(argc, argv, "Mini-language compiler\n");
+
+    std::ifstream file(InputFile);
     if (!file.is_open()) {
-        std::cerr << "Error: cannot open file '" << argv[1] << "'" << std::endl;
+        llvm::errs() << "Error: cannot open file '" << InputFile << "'\n";
         return 1;
     }
-
     std::ostringstream ss;
     ss << file.rdbuf();
-    std::string code = ss.str();
 
     try {
-        Lexer lexer(code);
-        std::vector<Token> tokens = lexer.tokenize();
+        Lexer lexer(ss.str());
+        auto tokens = lexer.tokenize();
 
         Parser parser(tokens);
         auto program = parser.parseProgram();
 
-        PrintVisitor printVisitor("ast_output.txt");
-        program->accept(&printVisitor);
-        std::cout << "AST written to ast_output.txt\n";
+        if (PrintAST) {
+            PrintVisitor printVisitor("ast_output.txt");
+            program->accept(&printVisitor);
+            llvm::outs() << "AST written to ast_output.txt\n";
+        }
 
-        std::cout << "\n=== Semantic Analysis ===\n";
         ScopeVisitor scopeVisitor;
-
         scopeVisitor.collectClasses(program.get());
-
         program->accept(&scopeVisitor);
 
-        std::cout << "\n--- Scope Tree ---\n";
-        scopeVisitor.getScopeTree().dump(std::cout);
-
-        std::ofstream scopeOut("scope_tree_output.txt");
-        if (scopeOut.is_open()) {
-            scopeVisitor.getScopeTree().dump(scopeOut);
-            std::cout << "\nScope tree written to scope_tree_output.txt\n";
+        if (DumpScope) {
+            std::ofstream scopeOut("scope_tree_output.txt");
+            if (scopeOut.is_open())
+                scopeVisitor.getScopeTree().dump(scopeOut);
         }
 
-        std::cout << "\n--- Symbol Table (classes) ---\n";
-        for (auto& [name, cls] : scopeVisitor.getSymbolTable().allClasses()) {
-            std::cout << "class " << name << " {\n";
-            std::cout << "  fields (" << cls.fieldCount() << "):\n";
-            for (auto& f : cls.fields) {
-                std::cout << "    " << f.name << " : " << f.type.toString() << "\n";
-            }
-            std::cout << "  methods:\n";
-            for (auto& [mname, m] : cls.methods) {
-                std::cout << "    " << (m.isConstructor ? "[ctor] " : "")
-                          << m.returnType.toString() << " " << m.name << "(";
-                bool first = true;
-                for (auto& p : m.params) {
-                    if (!first) std::cout << ", ";
-                    std::cout << p.type.toString() << " " << p.name;
-                    first = false;
-                }
-                std::cout << ")\n";
-            }
-            std::cout << "}\n";
-        }
+        llvm::outs() << "Semantic analysis passed.\n";
 
-        std::cout << "\nSemantic analysis passed.\n";
+        LLVMVisitor llvmVisitor(scopeVisitor.getSymbolTable(), InputFile);
+        program->accept(&llvmVisitor);
+
+        llvmVisitor.saveIR(OutputFile);
+        llvm::outs() << "LLVM IR written to " << OutputFile << "\n";
+        llvm::outs() << "Compile with: clang " << OutputFile << " -o program && ./program\n";
+
+        if (PrintIR) {
+            llvm::outs() << "\n=== LLVM IR ===\n";
+            llvmVisitor.printIR();
+        }
 
     } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
+        llvm::errs() << "Error: " << e.what() << "\n";
         return 1;
     }
 
