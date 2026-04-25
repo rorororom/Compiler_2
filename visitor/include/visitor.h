@@ -1,52 +1,24 @@
 #pragma once
+#include <functional>
+#include <typeindex>
+#include <typeinfo>
+#include <unordered_map>
 
-class Program;
-class DeclareStmt;
-class AssignStmt;
-class PrintStmt;
-class IfStmt;
-class NumberExpr;
-class VariableExpr;
-class BinaryExpr;
-class EqualExpr;
-
-class ClassDecl;
-class FieldDecl;
-class MethodDecl;
-class ReturnStmt;
-class VarDeclStmt;
-class NewObjectExpr;
-class NewArrayExpr;
-class MethodCallExpr;
-class FieldAccessExpr;
-class ThisExpr;
-class ArrayAccessExpr;
-class ArrayLengthExpr;
+class Node;
 
 class Visitor {
 public:
     virtual ~Visitor() = default;
 
-    virtual void visit(Program*      node) = 0;
-    virtual void visit(DeclareStmt*  node) = 0;
-    virtual void visit(AssignStmt*   node) = 0;
-    virtual void visit(PrintStmt*    node) = 0;
-    virtual void visit(IfStmt*       node) = 0;
-    virtual void visit(NumberExpr*   node) = 0;
-    virtual void visit(VariableExpr* node) = 0;
-    virtual void visit(BinaryExpr*   node) = 0;
-    virtual void visit(EqualExpr*    node) = 0;
+    template<typename T>
+    void registerHandler(std::function<void(T*)> fn) {
+        table_[typeid(T)] = [fn](Node* node) {
+            fn(static_cast<T*>(node));
+        };
+    }
 
-    virtual void visit(ClassDecl*       node) = 0;
-    virtual void visit(FieldDecl*       node) = 0;
-    virtual void visit(MethodDecl*      node) = 0;
-    virtual void visit(ReturnStmt*      node) = 0;
-    virtual void visit(VarDeclStmt*     node) = 0;
-    virtual void visit(NewObjectExpr*   node) = 0;
-    virtual void visit(NewArrayExpr*    node) = 0;
-    virtual void visit(MethodCallExpr*  node) = 0;
-    virtual void visit(FieldAccessExpr* node) = 0;
-    virtual void visit(ThisExpr*        node) = 0;
-    virtual void visit(ArrayAccessExpr* node) = 0;
-    virtual void visit(ArrayLengthExpr* node) = 0;
+    void dispatch(Node* node);
+
+protected:
+    std::unordered_map<std::type_index, std::function<void(Node*)>> table_;
 };

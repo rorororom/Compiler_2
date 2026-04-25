@@ -3,8 +3,10 @@
 #include "symbol_table.h"
 #include "scope_tree.h"
 #include "oop_nodes.h"
+#include "expressions.h"
+#include "statements.h"
+#include "program.h"
 #include <string>
-#include <vector>
 #include <stdexcept>
 
 class ScopeVisitor : public Visitor {
@@ -19,29 +21,6 @@ public:
     const ScopeTree&   getScopeTree()   const { return scopeTree_; }
     ScopeTree&         getScopeTree()         { return scopeTree_; }
 
-    void visit(Program*      node) override;
-    void visit(DeclareStmt*  node) override;
-    void visit(AssignStmt*   node) override;
-    void visit(PrintStmt*    node) override;
-    void visit(IfStmt*       node) override;
-    void visit(NumberExpr*   node) override;
-    void visit(VariableExpr* node) override;
-    void visit(BinaryExpr*   node) override;
-    void visit(EqualExpr*    node) override;
-
-    void visit(ClassDecl*       node) override;
-    void visit(FieldDecl*       node) override;
-    void visit(MethodDecl*      node) override;
-    void visit(ReturnStmt*      node) override;
-    void visit(VarDeclStmt*     node) override;
-    void visit(NewObjectExpr*   node) override;
-    void visit(NewArrayExpr*    node) override;
-    void visit(MethodCallExpr*  node) override;
-    void visit(FieldAccessExpr* node) override;
-    void visit(ThisExpr*        node) override;
-    void visit(ArrayAccessExpr* node) override;
-    void visit(ArrayLengthExpr* node) override;
-
 private:
     SymbolTable symTable_;
     ScopeTree   scopeTree_;
@@ -54,5 +33,5 @@ private:
 
     const VariableSymbol* resolveVar(const std::string& name);
 
-    TypeInfo resolveType(const TypeAnnotation& ann) const;
+    TypeInfo resolveType(const TypeInfo& ann) const;
 };

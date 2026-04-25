@@ -13,6 +13,7 @@ set(AST_SOURCES
 )
 
 set(VISITOR_SOURCES
+    visitor/src/visitor.cpp
     visitor/src/print_visitor.cpp
     visitor/src/interpreter_visitor.cpp
     visitor/src/scope_visitor.cpp

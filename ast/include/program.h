@@ -11,9 +11,7 @@ public:
         for (auto& stmt : statements)
             stmt->execute(ctx);
     }
-    
-    void accept(Visitor* visitor) override;
-    
+
     const std::vector<std::unique_ptr<Node>>& getStatements() const {
         return statements;
     }

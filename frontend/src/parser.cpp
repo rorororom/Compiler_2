@@ -64,26 +64,34 @@ void Parser::consume(TokenType type) {
     advance();
 }
 
-TypeAnnotation Parser::parseTypeAnnotation() {
-    TypeAnnotation ann;
+TypeInfo Parser::parseTypeAnnotation() {
+    TypeInfo ann;
     if (check(TokenType::INT)) {
-        ann.typeName = "int";
         advance();
+        if (check(TokenType::LBRACKET)) {
+            advance();
+            consume(TokenType::RBRACKET);
+            ann = TypeInfo::makeArrayInt();
+        } else {
+            ann = TypeInfo::makeInt();
+        }
     } else if (check(TokenType::VOID)) {
-        ann.typeName = "void";
         advance();
+        ann = TypeInfo::makeVoid();
     } else if (check(TokenType::ID)) {
-        ann.typeName = current().lexeme;
+        std::string name = current().lexeme;
         advance();
+        if (check(TokenType::LBRACKET)) {
+            advance();
+            consume(TokenType::RBRACKET);
+            ann = TypeInfo::makeArrayClass(name);
+        } else {
+            ann = TypeInfo::makeClass(name);
+        }
     } else {
         throw std::runtime_error(
             "Expected type name at position " + std::to_string(position) +
             ", got '" + current().lexeme + "'");
-    }
-    if (check(TokenType::LBRACKET)) {
-        advance();
-        consume(TokenType::RBRACKET);
-        ann.isArray = true;
     }
     return ann;
 }
@@ -177,7 +185,7 @@ std::unique_ptr<Node> Parser::parseStatement() {
 }
 
 std::unique_ptr<Node> Parser::parseVarDeclStmt() {
-    TypeAnnotation type = parseTypeAnnotation();
+    TypeInfo type = parseTypeAnnotation();
     std::string name = current().lexeme;
     consume(TokenType::ID);
 
@@ -197,7 +205,7 @@ std::unique_ptr<Node> Parser::parseClassDecl() {
     auto cls = std::make_unique<ClassDecl>(className);
 
     while (!check(TokenType::RBRACE) && !isAtEnd()) {
-        TypeAnnotation type = parseTypeAnnotation();
+        TypeInfo type = parseTypeAnnotation();
         std::string memberName = current().lexeme;
         consume(TokenType::ID);
 
@@ -213,17 +221,17 @@ std::unique_ptr<Node> Parser::parseClassDecl() {
     return cls;
 }
 
-std::unique_ptr<MethodDecl> Parser::parseMethodDecl(TypeAnnotation retType,
+std::unique_ptr<MethodDecl> Parser::parseMethodDecl(TypeInfo retType,
                                                      std::string name) {
     consume(TokenType::LPAREN);
 
-    std::vector<FormalParam> params;
+    MethodSymbol sym(name, std::move(retType), /*ownerClass=*/"");
     while (!check(TokenType::RPAREN) && !isAtEnd()) {
-        FormalParam fp;
-        fp.type = parseTypeAnnotation();
-        fp.name = current().lexeme;
+        TypeInfo ptype = parseTypeAnnotation();
+        std::string pname = current().lexeme;
         consume(TokenType::ID);
-        params.push_back(std::move(fp));
+        sym.addParam(VariableSymbol(std::move(pname), std::move(ptype),
+                                    VariableSymbol::StorageKind::PARAM));
         if (!check(TokenType::RPAREN)) {
             consume(TokenType::COMMA);
         }
@@ -231,8 +239,7 @@ std::unique_ptr<MethodDecl> Parser::parseMethodDecl(TypeAnnotation retType,
     consume(TokenType::RPAREN);
     consume(TokenType::LBRACE);
 
-    auto method = std::make_unique<MethodDecl>(
-        std::move(retType), std::move(name), std::move(params));
+    auto method = std::make_unique<MethodDecl>(std::move(sym));
 
     while (!check(TokenType::RBRACE) && !isAtEnd()) {
         method->addStatement(parseStatement());
@@ -333,7 +340,7 @@ std::unique_ptr<Expression> Parser::parsePrimary() {
     }
 
     if (match(TokenType::NEW)) {
-        TypeAnnotation elemType = parseTypeAnnotation();
+        TypeInfo elemType = parseTypeAnnotation();
 
         if (check(TokenType::LBRACKET)) {
             advance();
@@ -342,7 +349,7 @@ std::unique_ptr<Expression> Parser::parsePrimary() {
             return std::make_unique<NewArrayExpr>(std::move(elemType), std::move(size));
         } else {
             consume(TokenType::LPAREN);
-            auto obj = std::make_unique<NewObjectExpr>(elemType.typeName);
+            auto obj = std::make_unique<NewObjectExpr>(elemType.className);
             while (!check(TokenType::RPAREN) && !isAtEnd()) {
                 obj->addArg(parseExpression());
                 if (!check(TokenType::RPAREN)) consume(TokenType::COMMA);

@@ -405,7 +405,7 @@ TEST_F(ParserTest, ParseClassWithOneField) {
     ASSERT_NE(cls, nullptr);
     ASSERT_EQ(cls->getFields().size(), 1);
     EXPECT_EQ(cls->getFields()[0]->getName(), "x");
-    EXPECT_EQ(cls->getFields()[0]->getType().typeName, "int");
+    EXPECT_EQ(cls->getFields()[0]->getType().kind, VarKind::INT);
 }
 
 TEST_F(ParserTest, ParseClassWithMultipleFields) {
@@ -427,7 +427,7 @@ TEST_F(ParserTest, ParseClassWithMethod) {
     ASSERT_NE(cls, nullptr);
     ASSERT_EQ(cls->getMethods().size(), 1);
     EXPECT_EQ(cls->getMethods()[0]->getName(), "getValue");
-    EXPECT_EQ(cls->getMethods()[0]->getReturnType().typeName, "int");
+    EXPECT_EQ(cls->getMethods()[0]->getReturnType().kind, VarKind::INT);
     EXPECT_EQ(cls->getMethods()[0]->getParams().size(), 0);
 }
 
@@ -470,7 +470,7 @@ TEST_F(ParserTest, ParseTypedVarDecl) {
     auto* decl = dynamic_cast<VarDeclStmt*>(program->statements[0].get());
     ASSERT_NE(decl, nullptr);
     EXPECT_EQ(decl->getName(), "x");
-    EXPECT_EQ(decl->getType().typeName, "int");
+    EXPECT_EQ(decl->getType().kind, VarKind::INT);
     EXPECT_EQ(decl->getInitializer(), nullptr);
 }
 

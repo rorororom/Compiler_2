@@ -26,12 +26,12 @@ private:
     bool check(TokenType type) const;
     bool isAtEnd() const;
 
-    TypeAnnotation parseTypeAnnotation();
+    TypeInfo parseTypeAnnotation();
 
     std::unique_ptr<Node>       parseStatement();
     std::unique_ptr<Node>       parseVarDeclStmt();
     std::unique_ptr<Node>       parseClassDecl();
-    std::unique_ptr<MethodDecl> parseMethodDecl(TypeAnnotation retType,
+    std::unique_ptr<MethodDecl> parseMethodDecl(TypeInfo retType,
                                                  std::string name);
 
     std::unique_ptr<Expression> parseExpression();
