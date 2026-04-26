@@ -7,6 +7,7 @@
 
 enum class VarKind {
     INT,
+    VOID,
     CLASS_INST,
     ARRAY_INT,
     ARRAY_CLASS
@@ -16,7 +17,8 @@ struct TypeInfo {
     VarKind kind      = VarKind::INT;
     std::string className;
 
-    static TypeInfo makeInt()  { return {VarKind::INT, ""}; }
+    static TypeInfo makeInt()   { return {VarKind::INT,  ""}; }
+    static TypeInfo makeVoid()  { return {VarKind::VOID, ""}; }
     static TypeInfo makeClass(const std::string& name) {
         return {VarKind::CLASS_INST, name};
     }
@@ -28,6 +30,7 @@ struct TypeInfo {
     std::string toString() const {
         switch (kind) {
             case VarKind::INT:         return "int";
+            case VarKind::VOID:        return "void";
             case VarKind::CLASS_INST:  return className;
             case VarKind::ARRAY_INT:   return "int[]";
             case VarKind::ARRAY_CLASS: return className + "[]";
