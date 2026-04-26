@@ -10,6 +10,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/BasicBlock.h>
+#include <llvm/Target/TargetMachine.h>
 
 #include <string>
 #include <unordered_map>
@@ -45,6 +46,10 @@ public:
 
     void printIR() const;
     void saveIR(const std::string& filename) const;
+
+    void compileToObject(const std::string& objFile, int optLevel = 0);
+    void compileToExecutable(const std::string& outFile, int optLevel = 0);
+
     llvm::Module& getModule() { return *module_; }
 
 private:
@@ -52,6 +57,8 @@ private:
     std::unique_ptr<llvm::Module>      module_;
     llvm::IRBuilder<>                  builder_;
     const SymbolTable&                 symTable_;
+
+    std::unique_ptr<llvm::TargetMachine> targetMachine_;
 
     llvm::Value* lastValue_ = nullptr;
     std::string  currentClass_;
@@ -69,6 +76,8 @@ private:
     void declareClassTypes();
     void declareMethodPrototypes();
     void emitMainFunction(Program* node);
+
+    void runOptimizationPasses(int optLevel);
 
     llvm::Type*  llvmTypeFor(const TypeInfo& ti) const;
     llvm::Type*  llvmTypeFor(const std::string& typeName, bool isArray) const;

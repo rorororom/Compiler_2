@@ -4,24 +4,24 @@
 # =============================================================================
 set -euo pipefail
 
-IMAGE_NAME="compiler2"
+IMAGE_NAME="compiler5"
 
 usage() {
     cat <<EOF
 Usage: $0 [command]
 
 Commands:
-  build         Build the Docker image (default)
-  run <file>    Compile <file>, emit output.ll, then link and run with clang
-  shell         Open an interactive shell inside the container
-  test          Run unit tests inside the container
-  clean         Remove the Docker image
+  build              Build the Docker image (default)
+  run <file> [N]     Compile <file> to a native executable (opt-level N, default 0)
+  shell              Open an interactive shell inside the container
+  test               Run unit tests inside the container
+  clean              Remove the Docker image
 
 Examples:
   $0 build
   $0 run example/example.txt
-  $0 run example/example_1.txt
-  $0 run example/example_oop.txt
+  $0 run example/example_1.txt 2        # compile with -O2
+  $0 run example/example_oop.txt 3      # compile with -O3
   $0 shell
   $0 test
 EOF
@@ -35,17 +35,16 @@ cmd_build() {
 
 cmd_run() {
     local src="${1:-example/example.txt}"
-    echo "==> Compiling '${src}' inside Docker..."
+    local opt="${2:-0}"
+    echo "==> Compiling '${src}' (opt-level ${opt}) inside Docker..."
     docker run --rm \
         -v "$(pwd):/compiler" \
         -w /compiler \
         "${IMAGE_NAME}" \
         /bin/bash -c "
             set -e
-            ./build/compiler '${src}' -o output.ll --print-ir
+            ./build/compiler '${src}' --compile program --opt-level ${opt} --print-ir
             echo ''
-            echo '==> Compiling IR with clang...'
-            clang output.ll -o program
             echo '==> Running program...'
             ./program
         "

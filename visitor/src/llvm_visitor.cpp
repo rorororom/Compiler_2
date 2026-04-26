@@ -10,7 +10,20 @@
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Support/FileSystem.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/TargetParser/Host.h>
 
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/Target/TargetOptions.h>
+#include <llvm/MC/TargetRegistry.h>
+
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Analysis/LoopAnalysisManager.h>
+#include <llvm/Analysis/CGSCCPassManager.h>
+
+#include <llvm/IR/LegacyPassManager.h>
+
+#include <cstdlib>
 #include <stdexcept>
 
 LLVMVisitor::LLVMVisitor(const SymbolTable& symTable,
@@ -19,7 +32,97 @@ LLVMVisitor::LLVMVisitor(const SymbolTable& symTable,
     , builder_(context_)
     , symTable_(symTable)
 {
+    llvm::InitializeNativeTarget();
+    llvm::InitializeNativeTargetAsmPrinter();
+    llvm::InitializeNativeTargetAsmParser();
+
+    std::string triple = llvm::sys::getDefaultTargetTriple();
+    module_->setTargetTriple(triple);
+
+    std::string errMsg;
+    const llvm::Target* target =
+        llvm::TargetRegistry::lookupTarget(triple, errMsg);
+    if (!target)
+        throw std::runtime_error(
+            "LLVMVisitor: cannot find target for triple '" + triple +
+            "': " + errMsg);
+
+    llvm::TargetOptions opts;
+    targetMachine_.reset(target->createTargetMachine(
+        triple,
+        "generic",
+        "",
+        opts,
+        llvm::Reloc::PIC_));
+
+    module_->setDataLayout(targetMachine_->createDataLayout());
+
     declareRuntimeFunctions();
+}
+
+void LLVMVisitor::runOptimizationPasses(int optLevel) {
+    llvm::LoopAnalysisManager     LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager    CGAM;
+    llvm::ModuleAnalysisManager   MAM;
+
+    llvm::PassBuilder PB(targetMachine_.get());
+    PB.registerModuleAnalyses(MAM);
+    PB.registerCGSCCAnalyses(CGAM);
+    PB.registerFunctionAnalyses(FAM);
+    PB.registerLoopAnalyses(LAM);
+    PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+    llvm::OptimizationLevel lvl;
+    switch (optLevel) {
+        case 1:  lvl = llvm::OptimizationLevel::O1; break;
+        case 2:  lvl = llvm::OptimizationLevel::O2; break;
+        case 3:  lvl = llvm::OptimizationLevel::O3; break;
+        default: lvl = llvm::OptimizationLevel::O0; break;
+    }
+
+    llvm::ModulePassManager MPM;
+    if (lvl == llvm::OptimizationLevel::O0)
+        MPM = PB.buildO0DefaultPipeline(lvl);
+    else
+        MPM = PB.buildPerModuleDefaultPipeline(lvl);
+
+    MPM.run(*module_, MAM);
+}
+
+void LLVMVisitor::compileToObject(const std::string& objFile, int optLevel) {
+    runOptimizationPasses(optLevel);
+
+    std::error_code ec;
+    llvm::raw_fd_ostream dest(objFile, ec, llvm::sys::fs::OF_None);
+    if (ec)
+        throw std::runtime_error(
+            "compileToObject: cannot open '" + objFile + "': " + ec.message());
+
+    llvm::legacy::PassManager codegenPM;
+    if (targetMachine_->addPassesToEmitFile(
+            codegenPM, dest, nullptr,
+            llvm::CodeGenFileType::CGFT_ObjectFile))
+        throw std::runtime_error(
+            "compileToObject: target machine cannot emit object files");
+
+    codegenPM.run(*module_);
+    dest.flush();
+}
+
+void LLVMVisitor::compileToExecutable(const std::string& outFile, int optLevel) {
+    std::string tmpObj = outFile + ".o";
+    compileToObject(tmpObj, optLevel);
+
+    std::string cmd = "cc " + tmpObj + " -o " + outFile + " -lm 2>&1";
+    int ret = std::system(cmd.c_str());
+
+    std::remove(tmpObj.c_str());
+
+    if (ret != 0)
+        throw std::runtime_error(
+            "compileToExecutable: linker failed (exit code " +
+            std::to_string(ret) + ")");
 }
 
 void LLVMVisitor::declareRuntimeFunctions() {

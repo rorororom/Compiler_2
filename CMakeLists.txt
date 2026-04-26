@@ -20,6 +20,11 @@ llvm_map_components_to_libnames(LLVM_LIBS
     irreader
     native
     nativecodegen
+    passes
+    ipo
+    linker
+    mc
+    mcjit
 )
 
 set(AST_SOURCES

@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     llvm-17 \
     llvm-17-dev \
     clang-17 \
+    lld-17 \
     cmake \
     ninja-build \
     build-essential \
@@ -39,6 +40,9 @@ RUN echo "LLVM cmake dir: $(llvm-config-17 --cmakedir)" \
 WORKDIR /compiler
 
 COPY . .
+
+# Remove any stale build cache that may have been copied from the host
+RUN rm -rf build
 
 # Configure: use llvm-config-17 --cmakedir to get the correct path at build time
 # On failure, print the full CMake error log before exiting

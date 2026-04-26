@@ -15,11 +15,29 @@ static llvm::cl::opt<std::string> InputFile(
     llvm::cl::desc("<source file>"),
     llvm::cl::Required);
 
-static llvm::cl::opt<std::string> OutputFile(
+static llvm::cl::opt<std::string> OutputIR(
     "o",
     llvm::cl::desc("Output .ll file (default: output.ll)"),
     llvm::cl::value_desc("filename"),
     llvm::cl::init("output.ll"));
+
+static llvm::cl::opt<std::string> EmitObj(
+    "emit-obj",
+    llvm::cl::desc("Emit native object file (.o) to the given path"),
+    llvm::cl::value_desc("filename"),
+    llvm::cl::init(""));
+
+static llvm::cl::opt<std::string> CompileOut(
+    "compile",
+    llvm::cl::desc("Compile to native executable (implies --emit-obj)"),
+    llvm::cl::value_desc("filename"),
+    llvm::cl::init(""));
+
+static llvm::cl::opt<int> OptLevel(
+    "opt-level",
+    llvm::cl::desc("Optimisation level: 0 (none), 1, 2, 3 (default: 0)"),
+    llvm::cl::value_desc("N"),
+    llvm::cl::init(0));
 
 static llvm::cl::opt<bool> PrintAST(
     "print-ast",
@@ -79,13 +97,27 @@ int main(int argc, char* argv[]) {
         LLVMVisitor llvmVisitor(scopeVisitor.getSymbolTable(), InputFile);
         program->accept(&llvmVisitor);
 
-        llvmVisitor.saveIR(OutputFile);
-        llvm::outs() << "LLVM IR written to " << OutputFile << "\n";
-        llvm::outs() << "Compile with: clang " << OutputFile << " -o program && ./program\n";
+        llvmVisitor.saveIR(OutputIR);
+        llvm::outs() << "LLVM IR written to " << OutputIR << "\n";
 
         if (PrintIR) {
             llvm::outs() << "\n=== LLVM IR ===\n";
             llvmVisitor.printIR();
+        }
+
+        if (!EmitObj.empty()) {
+            llvmVisitor.compileToObject(EmitObj, OptLevel);
+            llvm::outs() << "Native object file written to " << EmitObj << "\n";
+        }
+
+        if (!CompileOut.empty()) {
+            llvmVisitor.compileToExecutable(CompileOut, OptLevel);
+            llvm::outs() << "Executable written to " << CompileOut << "\n";
+        }
+
+        if (EmitObj.empty() && CompileOut.empty()) {
+            llvm::outs() << "Tip: use --compile <outfile> to produce a native executable "
+                            "(opt-level 0-3 via --opt-level <N>)\n";
         }
 
     } catch (const std::exception& e) {
