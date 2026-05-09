@@ -90,7 +90,7 @@ public:
     }
 
     void dump(std::ostream& os, int depth = 0) const {
-        std::string pad(depth * 2, ' ');
+        std::string pad(depth * 4, ' ');
         os << pad << "[" << scopeKindName(kind_);
         if (!label_.empty()) os << " '" << label_ << "'";
         os << "]\n";

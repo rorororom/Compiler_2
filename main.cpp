@@ -3,6 +3,7 @@
 #include "print_visitor.h"
 #include "scope_visitor.h"
 #include "llvm_visitor.h"
+#include "interpreter_visitor.h"
 
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/TargetSelect.h>
@@ -54,6 +55,11 @@ static llvm::cl::opt<bool> DumpScope(
     llvm::cl::desc("Dump scope tree to scope_tree_output.txt"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> RunInterpreter(
+    "run-interpreter",
+    llvm::cl::desc("Run the interpreter"),
+    llvm::cl::init(false));
+
 int main(int argc, char* argv[]) {
     llvm::InitializeNativeTarget();
     llvm::InitializeNativeTargetAsmParser();
@@ -93,6 +99,12 @@ int main(int argc, char* argv[]) {
         }
 
         llvm::outs() << "Semantic analysis passed.\n";
+
+        if (RunInterpreter) {
+            llvm::outs() << "\n=== Execution (Interpreter) ===\n";
+            InterpreterVisitor interpreter;
+            program->accept(&interpreter);
+        }
 
         LLVMVisitor llvmVisitor(scopeVisitor.getSymbolTable(), InputFile);
         program->accept(&llvmVisitor);

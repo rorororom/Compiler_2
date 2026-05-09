@@ -19,7 +19,7 @@ PrintVisitor::~PrintVisitor() {
 
 void PrintVisitor::printIndent() {
     for (size_t i = 0; i < indent; ++i) {
-        out << "  ";
+        out << "    ";
     }
 }
 
@@ -31,6 +31,9 @@ std::string PrintVisitor::opToString(TokenType op) {
 void PrintVisitor::visit(Program* node) {
     out << "Program {" << std::endl;
     indent++;
+    for (auto& cls : node->getClasses()) {
+        cls->accept(this);
+    }
     for (auto& stmt : node->getStatements()) {
         stmt->accept(this);
     }

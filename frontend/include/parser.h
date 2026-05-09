@@ -30,7 +30,7 @@ private:
 
     std::unique_ptr<Node>       parseStatement();
     std::unique_ptr<Node>       parseVarDeclStmt();
-    std::unique_ptr<Node>       parseClassDecl();
+    std::unique_ptr<ClassDecl>  parseClassDecl();
     std::unique_ptr<MethodDecl> parseMethodDecl(TypeAnnotation retType,
                                                  std::string name);
 

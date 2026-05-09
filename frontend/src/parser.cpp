@@ -92,17 +92,17 @@ std::unique_ptr<Program> Parser::parseProgram() {
     auto program = std::make_unique<Program>();
 
     while (!isAtEnd()) {
-        program->statements.push_back(parseStatement());
+        if (check(TokenType::CLASS)) {
+            program->classes.push_back(parseClassDecl());
+        } else {
+            program->statements.push_back(parseStatement());
+        }
     }
 
     return program;
 }
 
 std::unique_ptr<Node> Parser::parseStatement() {
-    if (match(TokenType::CLASS)) {
-        return parseClassDecl();
-    }
-
     if (match(TokenType::DECLARE)) {
         std::string name = current().lexeme;
         consume(TokenType::ID);
@@ -189,7 +189,7 @@ std::unique_ptr<Node> Parser::parseVarDeclStmt() {
     return std::make_unique<VarDeclStmt>(std::move(type), std::move(name), std::move(init));
 }
 
-std::unique_ptr<Node> Parser::parseClassDecl() {
+std::unique_ptr<ClassDecl> Parser::parseClassDecl() {
     std::string className = current().lexeme;
     consume(TokenType::ID);
     consume(TokenType::LBRACE);

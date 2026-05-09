@@ -1,0 +1,14 @@
+Program {
+  Declare: x : int
+  Declare: y : int
+  Assign: x = 5
+  Assign: y = 10
+  If (((x + y) == 15)) {
+    Declare: x : int
+    Assign: x = 99
+    Print: x
+  } else {
+    Print: x
+  }
+  Print: x
+}
