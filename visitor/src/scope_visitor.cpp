@@ -31,37 +31,38 @@ const VariableSymbol* ScopeVisitor::resolveVar(const std::string& name) {
 }
 
 void ScopeVisitor::collectClasses(Program* program) {
-    for (auto& stmt : program->getStatements()) {
-        if (auto* cls = dynamic_cast<ClassDecl*>(stmt.get())) {
-            ClassSymbol classSym(cls->getName());
+    for (auto& cls : program->getClasses()) {
+        ClassSymbol classSym(cls->getName());
 
-            for (auto& fld : cls->getFields()) {
-                TypeInfo ftype = resolveType(fld->getType());
-                VariableSymbol vsym(fld->getName(), ftype,
-                                    VariableSymbol::StorageKind::FIELD);
-                classSym.addField(vsym);
-            }
-
-            for (auto& mth : cls->getMethods()) {
-                TypeInfo retType = resolveType(mth->getReturnType());
-                MethodSymbol msym(mth->getName(), retType, cls->getName());
-
-                for (auto& param : mth->getParams()) {
-                    TypeInfo ptype = resolveType(param.type);
-                    VariableSymbol psym(param.name, ptype,
-                                        VariableSymbol::StorageKind::PARAM);
-                    msym.addParam(psym);
-                }
-                classSym.addMethod(msym);
-            }
-
-            classSym.ensureConstructor();
-            symTable_.addClass(std::move(classSym));
+        for (auto& fld : cls->getFields()) {
+            TypeInfo ftype = resolveType(fld->getType());
+            VariableSymbol vsym(fld->getName(), ftype,
+                                VariableSymbol::StorageKind::FIELD);
+            classSym.addField(vsym);
         }
+
+        for (auto& mth : cls->getMethods()) {
+            TypeInfo retType = resolveType(mth->getReturnType());
+            MethodSymbol msym(mth->getName(), retType, cls->getName());
+
+            for (auto& param : mth->getParams()) {
+                TypeInfo ptype = resolveType(param.type);
+                VariableSymbol psym(param.name, ptype,
+                                    VariableSymbol::StorageKind::PARAM);
+                msym.addParam(psym);
+            }
+            classSym.addMethod(msym);
+        }
+
+        classSym.ensureConstructor();
+        symTable_.addClass(std::move(classSym));
     }
 }
 
 void ScopeVisitor::visit(Program* node) {
+    for (auto& cls : node->getClasses()) {
+        cls->accept(this);
+    }
     for (auto& stmt : node->getStatements()) {
         stmt->accept(this);
     }

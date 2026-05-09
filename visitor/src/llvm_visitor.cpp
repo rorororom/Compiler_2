@@ -69,6 +69,7 @@ int LLVMVisitor::fieldIndex(const std::string& className,
                              const std::string& fieldName) const {
     const ClassSymbol* cs = symTable_.findClass(className);
     if (!cs) return -1;
+
     const VariableSymbol* f = cs->findField(fieldName);
     return f ? f->index : -1;
 }
@@ -88,19 +89,27 @@ void LLVMVisitor::declareClassTypes() {
 void LLVMVisitor::declareMethodPrototypes() {
     for (auto& [className, cls] : symTable_.allClasses()) {
         llvm::Type* selfPtrTy = llvm::PointerType::get(classTypes_[className], 0);
+    
         for (auto& [mname, ms] : cls.methods) {
             if (ms.isConstructor) continue;
             std::vector<llvm::Type*> paramTypes = {selfPtrTy};
+
             for (auto& p : ms.params)
                 paramTypes.push_back(llvmTypeFor(p.type));
+
             llvm::FunctionType* ft = llvm::FunctionType::get(
                 llvmTypeFor(ms.returnType), paramTypes, false);
+
             std::string mangledName = mangleMethod(className, mname);
             llvm::Function* fn = llvm::Function::Create(
                 ft, llvm::Function::ExternalLinkage, mangledName, module_.get());
+
             auto argIt = fn->arg_begin();
             argIt->setName("self"); ++argIt;
-            for (auto& p : ms.params) { argIt->setName(p.name); ++argIt; }
+
+            for (auto& p : ms.params) {
+                argIt->setName(p.name); ++argIt;
+            }
             methodFunctions_[mangledName] = fn;
         }
     }
@@ -131,9 +140,10 @@ llvm::Value* LLVMVisitor::evalExpr(Expression* expr) {
 void LLVMVisitor::visit(Program* node) {
     declareClassTypes();
     declareMethodPrototypes();
-    for (auto& stmt : node->getStatements())
-        if (auto* cls = dynamic_cast<ClassDecl*>(stmt.get()))
-            cls->accept(this);
+
+    for (auto& cls : node->getClasses())
+        cls->accept(this);
+
     emitMainFunction(node);
 }
 
@@ -151,8 +161,7 @@ void LLVMVisitor::emitMainFunction(Program* node) {
     currentMethod_.clear();
 
     for (auto& stmt : node->getStatements())
-        if (!dynamic_cast<ClassDecl*>(stmt.get()))
-            stmt->accept(this);
+        stmt->accept(this);
 
     builder_.CreateRet(llvm::ConstantInt::get(llvm::Type::getInt32Ty(context_), 0));
     llvm::verifyFunction(*mainFn);
@@ -184,15 +193,19 @@ void LLVMVisitor::visit(IfStmt* node) {
     llvm::BasicBlock* thenBB  = llvm::BasicBlock::Create(context_, "then",  fn);
     llvm::BasicBlock* elseBB  = llvm::BasicBlock::Create(context_, "else",  fn);
     llvm::BasicBlock* mergeBB = llvm::BasicBlock::Create(context_, "merge", fn);
+    
     builder_.CreateCondBr(condBool, thenBB, elseBB);
 
     builder_.SetInsertPoint(thenBB);
     for (auto& s : node->getThenBranch()) s->accept(this);
-    if (!builder_.GetInsertBlock()->getTerminator()) builder_.CreateBr(mergeBB);
+    if (!builder_.GetInsertBlock()->getTerminator()) 
+        builder_.CreateBr(mergeBB);
 
     builder_.SetInsertPoint(elseBB);
-    for (auto& s : node->getElseBranch()) s->accept(this);
-    if (!builder_.GetInsertBlock()->getTerminator()) builder_.CreateBr(mergeBB);
+    for (auto& s : node->getElseBranch()) 
+        s->accept(this);
+    if (!builder_.GetInsertBlock()->getTerminator()) 
+        builder_.CreateBr(mergeBB);
 
     builder_.SetInsertPoint(mergeBB);
 }
@@ -234,6 +247,7 @@ void LLVMVisitor::visit(FieldDecl* /*node*/) {}
 
 void LLVMVisitor::visit(MethodDecl* node) {
     if (currentClass_.empty()) return;
+    
     std::string mangledName = mangleMethod(currentClass_, node->getName());
     llvm::Function* fn = methodFunctions_[mangledName];
     if (!fn) return;
@@ -243,11 +257,14 @@ void LLVMVisitor::visit(MethodDecl* node) {
     auto savedLocals = localVars_;
     auto savedThis   = thisPtr_;
     auto savedMethod = currentMethod_;
+    
     localVars_.clear();
     currentMethod_ = node->getName();
 
     auto argIt = fn->arg_begin();
-    thisPtr_ = &*argIt; thisPtr_->setName("self"); ++argIt;
+    thisPtr_ = &*argIt;
+    thisPtr_->setName("self");
+    ++argIt;
 
     for (auto& param : node->getParams()) {
         llvm::AllocaInst* alloca = builder_.CreateAlloca(
@@ -268,6 +285,7 @@ void LLVMVisitor::visit(MethodDecl* node) {
     }
 
     llvm::verifyFunction(*fn);
+    
     localVars_     = savedLocals;
     thisPtr_       = savedThis;
     currentMethod_ = savedMethod;
