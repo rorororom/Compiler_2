@@ -74,6 +74,10 @@ int main(int argc, char* argv[]) {
 
         std::cout << "\nSemantic analysis passed.\n";
 
+        std::cout << "\n=== Execution ===\n";
+        InterpreterVisitor interpreter;
+        program->accept(&interpreter);
+
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
         return 1;

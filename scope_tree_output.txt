@@ -1,0 +1,6 @@
+[global 'global']
+  var y : int (local)
+  var x : int (local)
+  [block 'if-then']
+    var x : int (local)
+  [block 'if-else']

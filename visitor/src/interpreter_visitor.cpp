@@ -29,11 +29,15 @@ InterpreterVisitor::InterpreterVisitor() {
         int condition = lastExpressionValue;
 
         if (condition) {
+            ctx.enterScope();
             for (auto& stmt : node->getThenBranch())
                 stmt->accept(this);
+            ctx.exitScope();
         } else {
+            ctx.enterScope();
             for (auto& stmt : node->getElseBranch())
                 stmt->accept(this);
+            ctx.exitScope();
         }
     });
 
