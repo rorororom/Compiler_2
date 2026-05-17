@@ -29,7 +29,7 @@ EOF
 
 cmd_build() {
     echo "==> Building Docker image '${IMAGE_NAME}'..."
-    docker build -t "${IMAGE_NAME}" .
+    docker build --platform linux/amd64 --pull -t "${IMAGE_NAME}" .
     echo "==> Done."
 }
 
@@ -37,13 +37,13 @@ cmd_run() {
     local src="${1:-example/example.txt}"
     local opt="${2:-0}"
     echo "==> Compiling '${src}' (opt-level ${opt}) inside Docker..."
-    docker run --rm \
+    docker run --rm --platform linux/amd64 \
         -v "$(pwd):/compiler" \
         -w /compiler \
         "${IMAGE_NAME}" \
         /bin/bash -c "
             set -e
-            ./build/compiler '${src}' --compile program --opt-level ${opt} --print-ir
+            /opt/build/compiler '${src}' --compile program --opt-level ${opt} --print-ir
             echo ''
             echo '==> Running program...'
             ./program
@@ -52,7 +52,7 @@ cmd_run() {
 
 cmd_shell() {
     echo "==> Opening shell in '${IMAGE_NAME}'..."
-    docker run --rm -it \
+    docker run --rm -it --platform linux/amd64 \
         -v "$(pwd):/compiler" \
         -w /compiler \
         "${IMAGE_NAME}" \
@@ -61,11 +61,11 @@ cmd_shell() {
 
 cmd_test() {
     echo "==> Running tests inside Docker..."
-    docker run --rm \
+    docker run --rm --platform linux/amd64 \
         -v "$(pwd):/compiler" \
         -w /compiler \
         "${IMAGE_NAME}" \
-        /bin/bash -c "./build/compiler_tests"
+        /bin/bash -c "/opt/build/compiler_tests"
 }
 
 cmd_clean() {

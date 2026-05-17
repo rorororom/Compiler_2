@@ -1,19 +1,10 @@
-FROM ubuntu:22.04
+FROM --platform=linux/amd64 ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install base tools and LLVM 17
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    lsb-release \
-    software-properties-common \
-    ca-certificates \
-    && wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
-       | tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc \
-    && echo "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-17 main" \
-       > /etc/apt/sources.list.d/llvm.list \
-    && apt-get update && apt-get install -y \
+# Ubuntu 24.04 (noble) ships LLVM 17 in its default repos.
+# No external apt.llvm.org repository needed.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     llvm-17 \
     llvm-17-dev \
     clang-17 \
@@ -22,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     ninja-build \
     build-essential \
     git \
+    ca-certificates \
     libffi-dev \
     libncurses-dev \
     zlib1g-dev \
@@ -37,27 +29,28 @@ RUN update-alternatives --install /usr/bin/llvm-config llvm-config /usr/bin/llvm
 RUN echo "LLVM cmake dir: $(llvm-config-17 --cmakedir)" \
     && ls "$(llvm-config-17 --cmakedir)"
 
-WORKDIR /compiler
+WORKDIR /src
 
 COPY . .
 
 # Remove any stale build cache that may have been copied from the host
 RUN rm -rf build
 
-# Configure: use llvm-config-17 --cmakedir to get the correct path at build time
-# On failure, print the full CMake error log before exiting
+# Build into /opt/build so it survives volume mounts over /compiler at runtime
 RUN LLVM_CMAKE=$(llvm-config-17 --cmakedir) && \
     echo "Using LLVM cmake dir: $LLVM_CMAKE" && \
-    cmake -S . -B build \
+    cmake -S . -B /opt/build \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_C_COMPILER=clang-17 \
         -DCMAKE_CXX_COMPILER=clang++-17 \
         -DLLVM_DIR="$LLVM_CMAKE" \
         -G Ninja \
-    || (cat build/CMakeFiles/CMakeError.log 2>/dev/null; \
-        cat build/CMakeFiles/CMakeOutput.log 2>/dev/null; \
+    || (cat /opt/build/CMakeFiles/CMakeError.log 2>/dev/null; \
+        cat /opt/build/CMakeFiles/CMakeOutput.log 2>/dev/null; \
         exit 1)
 
-RUN cmake --build build
+RUN cmake --build /opt/build
+
+WORKDIR /compiler
 
 CMD ["/bin/bash"]

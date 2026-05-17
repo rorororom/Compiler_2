@@ -289,13 +289,19 @@ void LLVMVisitor::visit(IfStmt* node) {
     llvm::BasicBlock* mergeBB = llvm::BasicBlock::Create(context_, "merge", fn);
     builder_.CreateCondBr(condBool, thenBB, elseBB);
 
+    // Save localVars_ before entering then-branch (scope for shadowing)
+    auto savedVarsThen = localVars_;
     builder_.SetInsertPoint(thenBB);
     for (auto& s : node->getThenBranch()) s->accept(this);
     if (!builder_.GetInsertBlock()->getTerminator()) builder_.CreateBr(mergeBB);
+    localVars_ = savedVarsThen;
 
+    // Save localVars_ before entering else-branch (scope for shadowing)
+    auto savedVarsElse = localVars_;
     builder_.SetInsertPoint(elseBB);
     for (auto& s : node->getElseBranch()) s->accept(this);
     if (!builder_.GetInsertBlock()->getTerminator()) builder_.CreateBr(mergeBB);
+    localVars_ = savedVarsElse;
 
     builder_.SetInsertPoint(mergeBB);
 }

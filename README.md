@@ -112,7 +112,7 @@ docker run --rm -it compiler5
 ```bash
 chmod +x build.sh
 ./build.sh build
-./build.sh run example/example.txt
+./build.sh run example/exxample_shadowing.txt
 ./build.sh shell
 ./build.sh test
 ```
